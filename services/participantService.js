@@ -1,6 +1,7 @@
 const db = require('../database');
 const queries = require('../database/queries');
 const Logger = require('../utils/logger');
+const eventService = require('../handlers/actions');
 
 class ParticipantService {
   async getParticipants(eventId) {
@@ -37,6 +38,7 @@ class ParticipantService {
         );
         
         Logger.info(`Увеличено количество плюсов для user_id=${userId}: ${newCount}`);
+        await eventService.handleParticipantAction(ctx, eventId, 'join');
         return { success: true, isNew: false, count: newCount };
       } else {
         // Добавляем нового участника
@@ -47,6 +49,7 @@ class ParticipantService {
         );
         
         Logger.info(`Добавлен участник: ${firstName} (user_id=${userId})`);
+        await eventService.handleParticipantAction(ctx, eventId, 'join');
         return { success: true, isNew: true, count: 1 };
       }
     } catch (error) {

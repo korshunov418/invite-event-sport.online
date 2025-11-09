@@ -1,7 +1,7 @@
 const db = require('../database');
 const queries = require('../database/queries');
 const Logger = require('../utils/logger');
-const eventService = require('../handlers/actions');
+const eventService = require( '../handlers/actions.js');
 
 class ParticipantService {
   async getParticipants(eventId) {

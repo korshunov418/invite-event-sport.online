@@ -83,7 +83,7 @@ class ParticipantService {
       }
 
       if (action === 'join') {
-        const result = await participantService.addParticipant(
+        const result = await addParticipant(
           eventRecord.id, 
           user.id, 
           user.username, 

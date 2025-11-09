@@ -28,7 +28,7 @@ async function handleStart(ctx) {
   
 if (args) {
         // Это переход из группового чата через deep link
-        log(`Deep link из группового чата: external_chat_id=${args}`);
+        Logger.info(`Deep link из группового чата: external_chat_id=${args}`);
         
         // Ищем существующее событие по external_chat_id
         const existingEvent = await eventService.getEventByExternalId(args);

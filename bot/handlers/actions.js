@@ -390,3 +390,81 @@ async function updateEventMessage(ctx, eventId, chatId, eventInfo) {
     Logger.error(`Ошибка обновления сообщения: ${error}`);
   }
 }
+// Функция для форматирования сообщения о событии
+function formatEventMessage(eventInfo, participants = [], language = 'ru') {
+    const localizations = {
+        'ru': {
+            'event_start_title': '🎯 Начинается событие!',
+            'event_name': '🏀 Событие',
+            'time': '⏰ Время',
+            'day': '📅 День',
+            'location': '📍 Место',
+            'comment': '💬 Комментарий',
+            'participants': '👥 Участники',
+            'participant_limit': 'до {limit} чел.',
+            'current_participants': 'Записалось: {current}',
+            'commands_title': '📝 Действия:',
+            'poll_closed': '❌ ОПРОС ЗАКРЫТ'
+        }
+    };
+
+    const t = localizations[language] || localizations['ru'];
+    
+    // Проверяем, активен ли опрос
+    const pollActive = isPollActive(eventInfo);
+    
+    let message = `<b>${t['event_start_title']}</b>\n\n`;
+    
+    message += `<b>${t['event_name']}:</b> ${eventInfo.event_name || 'Не указано'}\n`;
+    
+    if (eventInfo.start_time) {
+        message += `<b>${t['time']}:</b> ${eventInfo.start_time}\n`;
+    }
+    
+    if (eventInfo.weekly_days) {
+        try {
+            const days = JSON.parse(eventInfo.weekly_days);
+            if (days && days.length > 0) {
+                const dayTranslations = {
+                    'ru': {
+                        'monday': 'Понедельник', 'tuesday': 'Вторник', 'wednesday': 'Среда',
+                        'thursday': 'Четверг', 'friday': 'Пятница', 'saturday': 'Суббота', 'sunday': 'Воскресенье'
+                    }
+                };
+                const dayDict = dayTranslations[language] || dayTranslations['ru'];
+                const dayNames = days.map(day => dayDict[day] || day).join(', ');
+                message += `<b>${t['day']}:</b> ${dayNames}\n`;
+            }
+        } catch (e) {
+            log(`Ошибка парсинга дней недели: ${e}`);
+        }
+    }
+    
+    if (eventInfo.location) {
+        message += `<b>${t['location']}:</b> ${eventInfo.location}\n`;
+    }
+    
+    if (eventInfo.comment) {
+        message += `<b>${t['comment']}:</b> ${eventInfo.comment}\n`;
+    }
+    
+    // Информация об участниках
+    const totalRegistrations = participants.reduce((sum, participant) => sum + participant.plus_count, 0);
+    if (eventInfo.participant_limit) {
+        const limitText = t['participant_limit'].replace('{limit}', eventInfo.participant_limit);
+        message += `<b>${t['participants']}:</b> ${limitText}\n`;
+        message += `<b>${t['current_participants'].replace('{current}', totalRegistrations)}</b>\n`;
+    } else {
+        message += `<b>${t['participants']}:</b> ${totalRegistrations}\n`;
+    }
+    
+    // Статус опроса
+    if (!pollActive) {
+        message += `\n<b>${t['poll_closed']}</b>\n`;
+    }
+    
+    message += `\n<b>${t['commands_title']}</b>`;
+    
+    // ВАЖНО: Возвращаем объект с message и pollActive
+    return { message, pollActive };
+}

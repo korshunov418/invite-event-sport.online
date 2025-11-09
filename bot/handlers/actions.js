@@ -367,24 +367,24 @@ async function updateEventMessage(ctx, eventId, chatId, eventInfo) {
     if (lastMessage) {
       const lang = eventInfo.language || 'ru';
       // Здесь должна быть функция formatEventMessage
-      // const { message: formattedMessage, pollActive } = formatEventMessage(eventInfo, participants, lang);
-      // const keyboard = Keyboards.getEventKeyboard(eventInfo.id, lang, pollActive);
+      const { message: formattedMessage, pollActive } = formatEventMessage(eventInfo, participants, lang);
+      const keyboard = Keyboards.getEventKeyboard(eventInfo.id, lang, pollActive);
       
-      // try {
-      //   await ctx.telegram.editMessageText(
-      //     chatId,
-      //     lastMessage.message_id,
-      //     null,
-      //     formattedMessage,
-      //     {
-      //       parse_mode: 'HTML',
-      //       reply_markup: keyboard.reply_markup
-      //     }
-      //   );
-      //   Logger.info(`Сообщение обновлено: event=${eventId}`);
-      // } catch (error) {
-      //   Logger.error(`Ошибка редактирования сообщения: ${error}`);
-      // }
+      try {
+        await ctx.telegram.editMessageText(
+          chatId,
+          lastMessage.message_id,
+          null,
+          formattedMessage,
+          {
+            parse_mode: 'HTML',
+            reply_markup: keyboard.reply_markup
+          }
+        );
+        Logger.info(`Сообщение обновлено: event=${eventId}`);
+      } catch (error) {
+        Logger.error(`Ошибка редактирования сообщения: ${error}`);
+      }
     }
   } catch (error) {
     Logger.error(`Ошибка обновления сообщения: ${error}`);

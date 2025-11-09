@@ -35,7 +35,7 @@ if (args) {
         
         if (existingEvent) {
             // Используем существующее событие
-            const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${args}`;
+            const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${args}`;
             
             const keyboard = Markup.keyboard([
                 [Markup.button.webApp('Продолжить создание', miniAppUrl)],
@@ -55,7 +55,7 @@ if (args) {
                 const newExternalId = await eventService.createEventRecord(chat.id);
               //  await linkPersonalToGroupChat(newExternalId, args, groupChatId);
                 
-                const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${newExternalId}`;
+                const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${newExternalId}`;
                 
                 const keyboard = Markup.keyboard([
                     [Markup.button.webApp('Создать событие', miniAppUrl)],
@@ -74,7 +74,7 @@ if (args) {
         // Обычный старт в личном чате
         if (chat.type === 'private') {
             const externalChatId = await eventService.createEventRecord(chat.id);
-            const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
+            const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
             
             const keyboard = Markup.keyboard([
                 [Markup.button.webApp('Создать событие', miniAppUrl)],

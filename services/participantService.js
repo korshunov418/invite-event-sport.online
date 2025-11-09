@@ -1,7 +1,6 @@
 const db = require('../database');
 const queries = require('../database/queries');
 const Logger = require('../utils/logger');
-const eventService = require( '../handlers/actions.js');
 
 class ParticipantService {
   async getParticipants(eventId) {
@@ -38,7 +37,7 @@ class ParticipantService {
         );
         
         Logger.info(`Увеличено количество плюсов для user_id=${userId}: ${newCount}`);
-        await eventService.handleParticipantAction(ctx, eventId, 'join');
+        await handleParticipantAction(ctx, eventId, 'join');
         return { success: true, isNew: false, count: newCount };
       } else {
         // Добавляем нового участника
@@ -49,7 +48,7 @@ class ParticipantService {
         );
         
         Logger.info(`Добавлен участник: ${firstName} (user_id=${userId})`);
-        await eventService.handleParticipantAction(ctx, eventId, 'join');
+        await handleParticipantAction(ctx, eventId, 'join');
         return { success: true, isNew: true, count: 1 };
       }
     } catch (error) {
@@ -57,6 +56,65 @@ class ParticipantService {
       throw error;
     }
   }
+
+  async handleParticipantAction(ctx, eventId, action) {
+    try {
+      const user = ctx.from;
+      const chat = ctx.callbackQuery.message.chat;
+      
+      // Получаем информацию о мероприятии
+      const eventInfo = await queries.getEventInfo(eventId);
+      if (!eventInfo) {
+        await ctx.answerCbQuery('❌ Мероприятие не найдено');
+        return;
+      }
+
+      // Проверяем, активен ли еще опрос
+      if (!Helpers.isPollActive(eventInfo)) {
+        await ctx.answerCbQuery('❌ Опрос завершен, запись закрыта');
+        return;
+      }
+
+      // Находим запись события
+      const eventRecord = await eventService.getEventByExternalId(eventInfo.external_id);
+      if (!eventRecord) {
+        await ctx.answerCbQuery('❌ Событие не найдено');
+        return;
+      }
+
+      if (action === 'join') {
+        const result = await participantService.addParticipant(
+          eventRecord.id, 
+          user.id, 
+          user.username, 
+          user.first_name
+        );
+        
+        if (result.success) {
+          const message = result.isNew ? 
+            '✅ Вы записались на игру!' : 
+            `✅ +1 (всего: ${result.count})`;
+          await ctx.answerCbQuery(message);
+          await updateEventMessage(ctx, eventRecord.id, chat.id, eventInfo);
+        } else {
+          await ctx.answerCbQuery('❌ Ошибка при записи');
+        }
+      } else if (action === 'leave') {
+        const success = await participantService.removeParticipant(eventRecord.id, user.id);
+        if (success) {
+          await ctx.answerCbQuery('❌ Вы отписались от игры');
+          await updateEventMessage(ctx, eventRecord.id, chat.id, eventInfo);
+        } else {
+          await ctx.answerCbQuery('❌ Вы не были записаны');
+        }
+      }
+      
+    } catch (error) {
+      Logger.error(`Ошибка обработки действия участника: ${error}`);
+      await ctx.answerCbQuery('❌ Произошла ошибка');
+    }
+  }
+  
 
   async removeParticipant(eventId, userId) {
     try {

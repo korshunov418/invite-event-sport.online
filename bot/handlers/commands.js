@@ -43,63 +43,143 @@ async function handleStart(ctx) {
 async function handleDeepLinkStart(ctx, args, chat) {
   Logger.info(`Deep link: ${args}`);
   
-  if (args === 'group') {
-    await handleGroupDeepLink(ctx);
-    return;
-  }
+    // Обработка специальных deep link аргументов
+    if (args === 'group' || args === 'help') {
+        await handleSpecialDeepLink(ctx, args, chat);
+        return;
+    }
 
-  // Обработка существующего события
-  const existingEvent = await eventService.getEventByExternalId(args);
-  
-  if (existingEvent) {
+// Обработка существующего события по external_chat_id
+    try {
+        const existingEvent = await eventService.getEventByExternalId(args);
+        
+        if (existingEvent) {
+            await handleExistingEventDeepLink(ctx, args, chat, existingEvent);
+        } else {
+            await handleNewGroupLink(ctx, args, chat);
+        }
+    } catch (error) {
+        Logger.error(`Ошибка обработки deep link: ${error}`);
+        await ctx.reply("❌ Ошибка при обработке ссылки. Попробуйте снова.");
+    }
+}
+
+async function handleSpecialDeepLink(ctx, args, chat) {
+    if (args === 'group') {
+        if (chat.type === 'private') {
+            const externalChatId = await eventService.createEventRecord(chat.id);
+            const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
+            const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
+            
+            await ctx.reply(
+                "👋 Привет! Я бот для организации мероприятий в группах.\n\n" +
+                "Создайте событие для вашей группы, и участники смогут записываться через команды в чате!",
+                keyboard
+            );
+        } else {
+            await ctx.reply(
+                "ℹ️ Для создания событий перейдите в личные сообщения с ботом."
+            );
+        }
+    } else if (args === 'help') {
+        await handleHelp(ctx);
+    }
+}
+
+async function handleExistingEventDeepLink(ctx, args, chat, existingEvent) {
     const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${args}`;
-    const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
     
-    await ctx.reply(
-      `Продолжите создание события для группы.\n\nСвязь с группой установлена!`,
-      keyboard
-    );
-  } else {
-    await handleNewGroupLink(ctx, args, chat);
-  }
+    if (chat.type === 'private') {
+        const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl, 'ru', true);
+        
+        await ctx.reply(
+            "🔗 Связь с группой установлена!\n\n" +
+            "Вы можете продолжить настройку события для вашей группы:",
+            keyboard
+        );
+    } else {
+        // В групповом чате просто подтверждаем связь
+        await ctx.reply(
+            "✅ Связь с личным чатом установлена! Теперь вы можете управлять событиями через личные сообщения с ботом."
+        );
+    }
+    
+    Logger.event(`Deep link к существующему событию: ${args} в чате ${chat.id}`);
 }
 
-async function handleGroupDeepLink(ctx) {
-  const chat = ctx.chat;
-  
-  if (chat.type === 'private') {
-    const externalChatId = await eventService.createEventRecord(chat.id);
-    const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
-    const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
-    
-    await ctx.reply(
-      "Привет! В этом чате ты можешь создавать события для своих групп:",
-      keyboard
-    );
-  } else {
-    await ctx.reply(
-      "Эта команда предназначена для личных сообщений с ботом."
-    );
-  }
-}
 
 async function handleRegularStart(ctx, chat) {
-  if (chat.type === 'private') {
-    const externalChatId = await eventService.createEventRecord(chat.id);
-    const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
-    const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
-    
-    await ctx.reply(
-      "Привет! Я бот для организации мероприятий. Я помогу тебе создавать события, управлять участниками и делиться на команды.",
-      keyboard
-    );
-  } else {
-    const botUsername = ctx.botInfo.username;
-    const keyboard = Keyboards.getGroupHelpKeyboard(botUsername);
-    const helpText = `🏀 Бот для организации мероприятий\n\n📋 Команды в этой группе:\n+ ➕ Записаться на игру\n- ➖ Отписаться от игры\n/list 👥 Список участников\n/teams 🏈 Поделить на команды (админы)\n/help ℹ️ Помощь`;
-    
-    await ctx.reply(helpText, keyboard);
-  }
+    if (chat.type === 'private') {
+        await handlePrivateChatStart(ctx, chat);
+    } else {
+        await handleGroupChatStart(ctx, chat);
+    }
+}
+
+async function handlePrivateChatStart(ctx, chat) {
+    try {
+        const externalChatId = await eventService.createEventRecord(chat.id);
+        const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
+        const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
+        
+        const welcomeText = 
+            "👋 Привет! Я бот для организации мероприятий.\n\n" +
+            "🎯 <b>Что я умею:</b>\n" +
+            "• Создавать события через удобную форму\n" +
+            "• Управлять списком участников\n" +
+            "• Делить на команды автоматически\n" +
+            "• Отправлять уведомления о начале записи\n" +
+            "• Работать в группах и личных чатах\n\n" +
+            "🚀 <b>Начните с создания события!</b>";
+        
+        await ctx.reply(welcomeText, {
+            parse_mode: 'HTML',
+            ...keyboard
+        });
+        
+        Logger.info(`Новая сессия в личном чате: ${chat.id}, external_id: ${externalChatId}`);
+        
+    } catch (error) {
+        Logger.error(`Ошибка создания события в личном чате: ${error}`);
+        await ctx.reply(
+            "❌ Произошла ошибка при инициализации. Попробуйте еще раз или обратитесь к администратору."
+        );
+    }
+}
+
+async function handleGroupChatStart(ctx, chat) {
+    try {
+        // Создаем событие для группы
+        const externalChatId = await eventService.createEventRecord(chat.id);
+        const botUsername = ctx.botInfo.username;
+        const deepLink = `https://t.me/${botUsername}?start=${externalChatId}`;
+        
+        const helpText = 
+            "🏀 <b>Бот для организации мероприятий</b>\n\n" +
+            "📋 <b>Команды в этой группе:</b>\n" +
+            "<code>+</code> ➕ Записаться на игру\n" +
+            "<code>-</code> ➖ Отписаться от игры\n" +
+            "<code>/list</code> 👥 Список участников\n" +
+            "<code>/teams</code> 🏈 Поделить на команды (админы)\n" +
+            "<code>/help</code> ℹ️ Помощь\n\n" +
+            "🎯 <b>Чтобы создать событие:</b>\n" +
+            "Перейдите в личный чат с ботом";
+        
+        const keyboard = Keyboards.getGroupHelpKeyboard(botUsername);
+        
+        await ctx.reply(helpText, {
+            parse_mode: 'HTML',
+            ...keyboard
+        });
+        
+        Logger.info(`Новая сессия в групповом чате: ${chat.id}, external_id: ${externalChatId}`);
+        
+    } catch (error) {
+        Logger.error(`Ошибка создания события в групповом чате: ${error}`);
+        await ctx.reply(
+            "❌ Произошла ошибка при инициализации бота в группе."
+        );
+    }
 }
 
 async function handleList(ctx) {
@@ -404,6 +484,34 @@ async function checkAdminRights(ctx, chatId, userId) {
 }
 
 async function handleNewGroupLink(ctx, args, chat) {
-  // Заглушка для обработки новых групповых связей
-  await ctx.reply("🔗 Функция связывания чатов находится в разработке.");
+    try {
+        const groupChatId = await eventService.getChatIdByExternalId(args);
+        
+        if (groupChatId) {
+            // Создаем новое событие для личного чата, связывая с групповым external_chat_id
+            const newExternalId = await eventService.createEventRecord(chat.id);
+            
+            // Создаем связь между чатами
+            await eventService.createChatLink(newExternalId, args, groupChatId);
+            
+            const miniAppUrl = `${config.MINI_APP_BASE_URL}?chat_id=${newExternalId}`;
+            const keyboard = Keyboards.getWebAppKeyboard(miniAppUrl);
+            
+            await ctx.reply(
+                "🔗 Связь с группой установлена!\n\n" +
+                "Теперь вы можете создать событие для вашей группы:",
+                keyboard
+            );
+            
+            Logger.info(`Создана связь чатов: personal=${newExternalId}, group=${args}`);
+        } else {
+            await ctx.reply(
+                "❌ Не удалось найти связанную группу. Возможно, ссылка устарела.\n\n" +
+                "Попробуйте создать новое событие через меню бота."
+            );
+        }
+    } catch (error) {
+        Logger.error(`Ошибка создания связи с группой: ${error}`);
+        await ctx.reply("❌ Ошибка при создании связи с группой. Попробуйте снова.");
+    }
 }

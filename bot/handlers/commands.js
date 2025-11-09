@@ -31,7 +31,7 @@ if (args) {
         log(`Deep link из группового чата: external_chat_id=${args}`);
         
         // Ищем существующее событие по external_chat_id
-        const existingEvent = await getEventByExternalId(args);
+        const existingEvent = await eventService.getEventByExternalId(args);
         
         if (existingEvent) {
             // Используем существующее событие
@@ -49,10 +49,10 @@ if (args) {
             );
         } else {
             // Создаем новую связь между личным чатом и групповым
-            const groupChatId = await getChatIdByExternalId(args);
+            const groupChatId = await eventService.getChatIdByExternalId(args);
             if (groupChatId) {
                 // Создаем запись в events для личного чата, но связываем с групповым external_chat_id
-                const newExternalId = await createEventRecord(chat.id);
+                const newExternalId = await eventService.createEventRecord(chat.id);
               //  await linkPersonalToGroupChat(newExternalId, args, groupChatId);
                 
                 const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${newExternalId}`;
@@ -73,7 +73,7 @@ if (args) {
     } else {
         // Обычный старт в личном чате
         if (chat.type === 'private') {
-            const externalChatId = await createEventRecord(chat.id);
+            const externalChatId = await eventService.createEventRecord(chat.id);
             const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
             
             const keyboard = Markup.keyboard([
@@ -87,7 +87,7 @@ if (args) {
             );
         } else {
             // Групповой чат - создаем событие и предлагаем перейти в личный
-            const externalChatId = await createEventRecord(chat.id);
+            const externalChatId = await eventService.createEventRecord(chat.id);
             const botUsername = ctx.botInfo.username;
             const deepLink = `https://t.me/${botUsername}?start=${externalChatId}`;
             

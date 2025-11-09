@@ -29,11 +29,11 @@ async function handleStart(ctx) {
   try {
     Logger.info(`Команда /start от ${user.first_name} в чате ${chat.id}`);
 
-    if (args) {
+   // if (args) {
       await handleDeepLinkStart(ctx, args, chat);
-    } else {
-      await handleRegularStart(ctx, chat);
-    }
+   // } else {
+   //   await handleRegularStart(ctx, chat);
+   // }
   } catch (error) {
     Logger.error(`Ошибка обработки команды start: ${error}`);
     await ctx.reply("❌ Произошла ошибка при запуске бота.");

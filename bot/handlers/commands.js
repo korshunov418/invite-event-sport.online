@@ -26,18 +26,94 @@ async function handleStart(ctx) {
   const chat = ctx.chat;
   const user = ctx.from;
   
-  try {
-    Logger.info(`Команда /start от ${user.first_name} в чате ${chat.id}`);
+if (args) {
+        // Это переход из группового чата через deep link
+        log(`Deep link из группового чата: external_chat_id=${args}`);
+        
+        // Ищем существующее событие по external_chat_id
+        const existingEvent = await getEventByExternalId(args);
+        
+        if (existingEvent) {
+            // Используем существующее событие
+            const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${args}`;
+            
+            const keyboard = Markup.keyboard([
+                [Markup.button.webApp('Продолжить создание', miniAppUrl)],
+                ['Информация', 'Помощь']
+            ]).resize();
+            
+            await ctx.reply(
+                `Продолжите создание события для группы.\n\n` +
+                `Связь с группой установлена!`,
+                keyboard
+            );
+        } else {
+            // Создаем новую связь между личным чатом и групповым
+            const groupChatId = await getChatIdByExternalId(args);
+            if (groupChatId) {
+                // Создаем запись в events для личного чата, но связываем с групповым external_chat_id
+                const newExternalId = await createEventRecord(chat.id);
+              //  await linkPersonalToGroupChat(newExternalId, args, groupChatId);
+                
+                const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${newExternalId}`;
+                
+                const keyboard = Markup.keyboard([
+                    [Markup.button.webApp('Создать событие', miniAppUrl)],
+                    ['Информация', 'Помощь']
+                ]).resize();
+                
+                await ctx.reply(
+                    "Связь с группой установлена! Теперь вы можете создать событие:",
+                    keyboard
+                );
+            } else {
+                await ctx.reply("❌ Ошибка: не удалось найти группу. Попробуйте снова.");
+            }
+        }
+    } else {
+        // Обычный старт в личном чате
+        if (chat.type === 'private') {
+            const externalChatId = await createEventRecord(chat.id);
+            const miniAppUrl = `${MINI_APP_BASE_URL}?chat_id=${externalChatId}`;
+            
+            const keyboard = Markup.keyboard([
+                [Markup.button.webApp('Создать событие', miniAppUrl)],
+                ['Информация', 'Помощь']
+            ]).resize();
+            
+            await ctx.reply(
+                "Привет! В этом чате ты можешь создавать события:",
+                keyboard
+            );
+        } else {
+            // Групповой чат - создаем событие и предлагаем перейти в личный
+            const externalChatId = await createEventRecord(chat.id);
+            const botUsername = ctx.botInfo.username;
+            const deepLink = `https://t.me/${botUsername}?start=${externalChatId}`;
+            
+            const helpText = `Для создания события перейдите в личный чат с ботом:\n\n📋 Команды в этой группе:\n+ ➕ Записаться на игру\n- ➖ Отписаться от игры\n/list 👥 Список участников\n/teams 🏈 Поделить на команды (админы)\n/help ℹ️ Помощь`;
+            
+            const keyboard = Markup.inlineKeyboard([
+                [Markup.button.url('Создать событие', deepLink)],
+                [Markup.button.callback('Помощь', 'help')]
+            ]);
+            
+            await ctx.reply(helpText, keyboard);
+        }
+    }
+  
+  // try {
+  //   Logger.info(`Команда /start от ${user.first_name} в чате ${chat.id}`);
 
-   // if (args) {
-      await handleDeepLinkStart(ctx, args, chat);
-   // } else {
-   //   await handleRegularStart(ctx, chat);
-   // }
-  } catch (error) {
-    Logger.error(`Ошибка обработки команды start: ${error}`);
-    await ctx.reply("❌ Произошла ошибка при запуске бота.");
-  }
+  //   if (args) {
+  //     await handleDeepLinkStart(ctx, args, chat);
+  //   } else {
+  //     await handleRegularStart(ctx, chat);
+  //   }
+  // } catch (error) {
+  //   Logger.error(`Ошибка обработки команды start: ${error}`);
+  //   await ctx.reply("❌ Произошла ошибка при запуске бота.");
+  // }
 }
 
 async function handleDeepLinkStart(ctx, args, chat) {
